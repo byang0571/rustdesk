@@ -920,7 +920,7 @@ _connectDialog(
       );
       close();
       dialogManager.showLoading(translate('Logging in...'),
-          onCancel: closeConnection);
+          showTimer: true, peerId: gFFI.id, onCancel: closeConnection);
     }
 
     descWidget(String text) {
@@ -2282,7 +2282,7 @@ void enter2FaDialog(
       gFFI.send2FA(sessionId, controller.text.trim(), trustThisDevice.value);
       close();
       dialogManager.showLoading(translate('Logging in...'),
-          onCancel: closeConnection);
+          showTimer: true, peerId: gFFI.id, onCancel: closeConnection);
     }
 
     late Dialog2FaField codeField;

@@ -934,20 +934,6 @@ jobs:
               reltype: release,
               suffix: "",
             }
-          - {
-              arch: armv7,
-              target: armv7-linux-androideabi,
-              os: ubuntu-24.04,
-              reltype: release,
-              suffix: "",
-            }
-          - {
-              arch: x86_64,
-              target: x86_64-linux-android,
-              os: ubuntu-24.04,
-              reltype: release,
-              suffix: "",
-            }
     steps:
       - name: Free Disk Space (Ubuntu)
         uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
@@ -1075,6 +1061,10 @@ jobs:
         with:
           prefix-key: rustdesk-lib-cache-android # TODO: drop '-android' part after caches are invalidated
           key: ${{ matrix.job.target }}
+
+      - name: Patch hbb_common for secure_tcp timeout optimization
+        run: |
+          sed -i 's/pub const READ_TIMEOUT: u64 = 18_000;/pub const READ_TIMEOUT: u64 = 18_000;\npub const SECURE_TCP_TIMEOUT: u64 = 1_000;/' libs/hbb_common/src/config.rs
 
       - name: Build rustdesk lib
         env:
@@ -1214,7 +1204,7 @@ jobs:
   build-rustdesk-android-universal:
     needs: [build-rustdesk-android]
     name: build rustdesk android universal apk
-    if: ${{ inputs.upload-artifact }}
+    if: false
     runs-on: ubuntu-24.04
     env:
       reltype: release

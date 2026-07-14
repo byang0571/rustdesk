@@ -9,6 +9,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common/formatter/id_formatter.dart';
+import 'package:flutter_hbb/common/shared_state.dart';
 import 'package:flutter_hbb/desktop/widgets/refresh_wrapper.dart';
 import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
 import 'package:flutter_hbb/main.dart';
@@ -894,7 +895,9 @@ class OverlayDialogManager {
       {bool clickMaskDismiss = false,
       bool showCancel = true,
       VoidCallback? onCancel,
-      String? tag}) {
+      String? tag,
+      bool showTimer = false,
+      String? peerId}) {
     if (tag == null) {
       tag = _tagCount.toString();
       _tagCount++;
@@ -908,31 +911,13 @@ class OverlayDialogManager {
       }
 
       return CustomAlertDialog(
-        content: Container(
-            constraints: const BoxConstraints(maxWidth: 240),
-            child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 30),
-                  const Center(child: CircularProgressIndicator()),
-                  const SizedBox(height: 20),
-                  Center(
-                      child: Text(translate(text),
-                          style: const TextStyle(fontSize: 15))),
-                  const SizedBox(height: 20),
-                  Offstage(
-                      offstage: !showCancel,
-                      child: Center(
-                          child: (isDesktop || isWebDesktop)
-                              ? dialogButton('Cancel', onPressed: cancel)
-                              : TextButton(
-                                  style: flatButtonStyle,
-                                  onPressed: cancel,
-                                  child: Text(translate('Cancel'),
-                                      style: const TextStyle(
-                                          color: MyTheme.accent)))))
-                ])),
+        content: _LoadingContent(
+          text: text,
+          showCancel: showCancel,
+          onCancel: cancel,
+          showTimer: showTimer,
+          peerId: peerId,
+        ),
         onCancel: showCancel ? cancel : null,
       );
     }, tag: tag);
@@ -1054,6 +1039,178 @@ void showToast(String text,
   Future.delayed(timeout, () {
     entry.remove();
   });
+}
+
+class _LoadingContent extends StatefulWidget {
+  const _LoadingContent({
+    required this.text,
+    this.showCancel = true,
+    this.onCancel,
+    this.showTimer = false,
+    this.peerId,
+  });
+
+  final String text;
+  final bool showCancel;
+  final VoidCallback? onCancel;
+  final bool showTimer;
+  final String? peerId;
+
+  @override
+  State<_LoadingContent> createState() => _LoadingContentState();
+}
+
+class _LoadingContentState extends State<_LoadingContent>
+    with TickerProviderStateMixin {
+  Timer? _timer;
+  final Stopwatch _stopwatch = Stopwatch();
+  late final AnimationController _pulseController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+      lowerBound: 0.4,
+      upperBound: 1.0,
+    );
+    _pulseController.repeat(reverse: true);
+    if (widget.showTimer) {
+      _stopwatch.start();
+      _timer = Timer.periodic(const Duration(milliseconds: 100), (_) {
+        if (mounted) setState(() {});
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _stopwatch.stop();
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  String _formatElapsed() {
+    final ms = _stopwatch.elapsedMilliseconds;
+    return '${(ms / 100).round() / 10}s';
+  }
+
+  ConnectionType? _getConnectionType() {
+    if (widget.peerId == null) return null;
+    final key = ConnectionTypeState.tag(widget.peerId!);
+    if (!Get.isRegistered<ConnectionType>(tag: key)) return null;
+    return ConnectionTypeState.find(widget.peerId!);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+        constraints: const BoxConstraints(maxWidth: 320),
+        child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const SizedBox(height: 24),
+              AnimatedBuilder(
+                animation: _pulseController,
+                builder: (context, child) {
+                  return Opacity(
+                    opacity: _pulseController.value,
+                    child: child,
+                  );
+                },
+                child: SvgPicture.asset('assets/icon.svg',
+                    width: 32, height: 32),
+              ),
+              const SizedBox(height: 16),
+              Obx(() {
+                final connType = _getConnectionType();
+                final bool connReady =
+                    connType != null && connType.isValid();
+                String stageText;
+                Widget? connectionTypeRow;
+                if (connReady) {
+                  final secure =
+                      connType.secure.value == ConnectionType.strSecure;
+                  final direct =
+                      connType.direct.value == ConnectionType.strDirect;
+                  final streamType = connType.stream_type.value;
+                  final iconName =
+                      '${secure ? 'secure' : 'insecure'}${direct ? '' : '_relay'}';
+                  stageText = translate('Establishing secure connection...');
+                  connectionTypeRow = Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SvgPicture.asset('assets/$iconName.svg',
+                          width: 16, height: 16),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          translate(
+                              getConnectionText(secure, direct, streamType)),
+                          style: TextStyle(
+                              fontSize: 12, color: MyTheme.darkGray),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  );
+                } else {
+                  stageText = translate(widget.text);
+                }
+                return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text(stageText,
+                          style: const TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w500),
+                          textAlign: TextAlign.center),
+                      const SizedBox(height: 16),
+                      LinearProgressIndicator(
+                        value: null,
+                        minHeight: 4,
+                        borderRadius: BorderRadius.circular(2),
+                        backgroundColor: MyTheme.grayBg,
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                            MyTheme.accent),
+                      ),
+                      if (widget.showTimer || connectionTypeRow != null) ...[
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            if (connectionTypeRow != null)
+                              Flexible(child: connectionTypeRow)
+                            else
+                              const Spacer(),
+                            if (widget.showTimer)
+                              Text(_formatElapsed(),
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: MyTheme.darkGray)),
+                          ],
+                        ),
+                      ],
+                    ]);
+              }),
+              const SizedBox(height: 20),
+              Offstage(
+                  offstage: !widget.showCancel,
+                  child: Center(
+                      child: (isDesktop || isWebDesktop)
+                          ? dialogButton('Cancel',
+                              onPressed: widget.onCancel ?? () {})
+                          : TextButton(
+                              style: flatButtonStyle,
+                              onPressed: widget.onCancel,
+                              child: Text(translate('Cancel'),
+                                  style: const TextStyle(
+                                      color: MyTheme.accent))))),
+            ]));
+  }
 }
 
 // TODO
