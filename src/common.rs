@@ -1947,8 +1947,16 @@ async fn secure_tcp_impl(conn: &mut Stream, key: &str, log_on_success: bool) -> 
     let Some(rs_pk) = rs_pk else {
         bail!("Handshake failed: invalid public key from rendezvous server");
     };
-    match timeout(SECURE_TCP_TIMEOUT, conn.next()).await? {
-        Some(Ok(bytes)) => {
+    match timeout(SECURE_TCP_TIMEOUT, conn.next()).await {
+        Err(_) => {
+            // Timeout: server may not support secure_tcp KeyExchange (e.g. hbbs < 1.1.16).
+            // Fall back to plain connection instead of failing the whole connection.
+            log::warn!(
+                "secure_tcp handshake timed out, falling back to plain connection"
+            );
+            return Ok(());
+        }
+        Ok(Some(Ok(bytes))) => {
             if let Ok(msg_in) = RendezvousMessage::parse_from_bytes(&bytes) {
                 match msg_in.union {
                     Some(rendezvous_message::Union::KeyExchange(ex)) => {
