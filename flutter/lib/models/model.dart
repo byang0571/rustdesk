@@ -737,6 +737,9 @@ class FfiModel with ChangeNotifier {
     parent.target?.imageModel.setUseTextureRender(evt['v'] == 'Y');
     waitForFirstImage.value = true;
     isRefreshing = true;
+    // Ensure any lingering loading dialogs are dismissed before showing
+    // the "waiting for image" dialog, to avoid overlapping/gray dialogs.
+    parent.target?.dialogManager.dismissAll();
     showConnectedWaitingForImage(parent.target!.dialogManager, sessionId,
         'success', 'Successful', kMsgboxTextWaitingForImage);
   }
@@ -1182,6 +1185,7 @@ class FfiModel with ChangeNotifier {
           actions: [
             dialogButton("Cancel", onPressed: onClose, isOutline: true)
           ],
+          contentBoxConstraints: const BoxConstraints(maxWidth: 320),
           onCancel: onClose),
       tag: '$sessionId-waiting-for-image',
     );

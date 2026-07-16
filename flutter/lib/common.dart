@@ -1125,76 +1125,55 @@ class _LoadingContentState extends State<_LoadingContent>
                     width: 32, height: 32),
               ),
               const SizedBox(height: 16),
-              Obx(() {
+              Builder(builder: (context) {
                 final connType = _getConnectionType();
-                final bool connReady =
-                    connType != null && connType.isValid();
-                String stageText;
-                Widget? connectionTypeRow;
-                if (connReady) {
-                  final secure =
-                      connType.secure.value == ConnectionType.strSecure;
-                  final direct =
-                      connType.direct.value == ConnectionType.strDirect;
-                  final streamType = connType.stream_type.value;
-                  final iconName =
-                      '${secure ? 'secure' : 'insecure'}${direct ? '' : '_relay'}';
-                  stageText = translate('Establishing secure connection...');
-                  connectionTypeRow = Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SvgPicture.asset('assets/$iconName.svg',
-                          width: 16, height: 16),
-                      const SizedBox(width: 6),
-                      Flexible(
-                        child: Text(
-                          translate(
-                              getConnectionText(secure, direct, streamType)),
-                          style: TextStyle(
-                              fontSize: 12, color: MyTheme.darkGray),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
+                if (connType == null) {
+                  // peerId is null (e.g. showLoading('Connecting...') without peerId).
+                  // Avoid Obx here because no reactive variable is read, which may
+                  // cause rendering issues in release mode.
+                  return _buildLoadingStage(
+                    stageText: translate(widget.text),
+                    connectionTypeRow: null,
                   );
-                } else {
-                  stageText = translate(widget.text);
                 }
-                return Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Text(stageText,
-                          style: const TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w500),
-                          textAlign: TextAlign.center),
-                      const SizedBox(height: 16),
-                      LinearProgressIndicator(
-                        value: null,
-                        minHeight: 4,
-                        borderRadius: BorderRadius.circular(2),
-                        backgroundColor: MyTheme.grayBg,
-                        valueColor: const AlwaysStoppedAnimation<Color>(
-                            MyTheme.accent),
-                      ),
-                      if (widget.showTimer || connectionTypeRow != null) ...[
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            if (connectionTypeRow != null)
-                              Flexible(child: connectionTypeRow)
-                            else
-                              const Spacer(),
-                            if (widget.showTimer)
-                              Text(_formatElapsed(),
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      color: MyTheme.darkGray)),
-                          ],
+                return Obx(() {
+                  final bool connReady = connType.isValid();
+                  String stageText;
+                  Widget? connectionTypeRow;
+                  if (connReady) {
+                    final secure =
+                        connType.secure.value == ConnectionType.strSecure;
+                    final direct =
+                        connType.direct.value == ConnectionType.strDirect;
+                    final streamType = connType.stream_type.value;
+                    final iconName =
+                        '${secure ? 'secure' : 'insecure'}${direct ? '' : '_relay'}';
+                    stageText = translate('Establishing secure connection...');
+                    connectionTypeRow = Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SvgPicture.asset('assets/$iconName.svg',
+                            width: 16, height: 16),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            translate(
+                                getConnectionText(secure, direct, streamType)),
+                            style: TextStyle(
+                                fontSize: 12, color: MyTheme.darkGray),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
-                    ]);
+                    );
+                  } else {
+                    stageText = translate(widget.text);
+                  }
+                  return _buildLoadingStage(
+                    stageText: stageText,
+                    connectionTypeRow: connectionTypeRow,
+                  );
+                });
               }),
               const SizedBox(height: 20),
               Offstage(
@@ -1210,6 +1189,46 @@ class _LoadingContentState extends State<_LoadingContent>
                                   style: const TextStyle(
                                       color: MyTheme.accent))))),
             ]));
+  }
+
+  Widget _buildLoadingStage({
+    required String stageText,
+    Widget? connectionTypeRow,
+  }) {
+    return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(stageText,
+              style: const TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.w500),
+              textAlign: TextAlign.center),
+          const SizedBox(height: 16),
+          LinearProgressIndicator(
+            value: null,
+            minHeight: 4,
+            borderRadius: BorderRadius.circular(2),
+            backgroundColor: MyTheme.grayBg,
+            valueColor:
+                const AlwaysStoppedAnimation<Color>(MyTheme.accent),
+          ),
+          if (widget.showTimer || connectionTypeRow != null) ...[
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                if (connectionTypeRow != null)
+                  Flexible(child: connectionTypeRow)
+                else
+                  const Spacer(),
+                if (widget.showTimer)
+                  Text(_formatElapsed(),
+                      style:
+                          TextStyle(fontSize: 12, color: MyTheme.darkGray)),
+              ],
+            ),
+          ],
+        ]);
   }
 }
 
